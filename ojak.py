@@ -1,14 +1,13 @@
-Омурбек Максутов, [28.04.2024 22:21]
 from aiogram import Bot, Dispatcher, types, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from config import tOken
+from config import token
 from logging import basicConfig, INFO
 import sqlite3
 from datetime import datetime
 
-bot = Bot(tOken)
+bot = Bot(token=token)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 basicConfig(level=INFO)
@@ -68,11 +67,11 @@ async def start(message:types.Message):
             '{message.from_user.username}',
             '{datetime.now()}'
 );""")
-        
-        cursor.connection.commit()
+    await message.answer("Здраствуйте")
+    cursor.connection.commit()
 @dp.message_handler(text='Меню')
 async def manu(message:types.Message):
-    await message.answer("Шашлыки'🖇🙌🏻\nhttps://nambafood.kg/ojak-kebap", reply_markup=start_keyboard)
+    await message.answer("Шашлыки:  \nhttps://nambafood.kg/ojak-kebap", reply_markup=start_keyboard)
 
 
 @dp.message_handler(text='О нас')
@@ -88,7 +87,7 @@ async def about(message:types.Message):
 
 @dp.message_handler(text = 'Адрес')
 async def address(message: types.Message):
-    await message.answer("📌 Адрес:  234، 246 Курманжан-Датка ул., Ош")
+    await message.answer("Адрес:  234، 246 Курманжан-Датка ул., Ош")
    
 
 
@@ -112,3 +111,33 @@ async def process_food_title(message: types.Message, state: FSMContext):
         data['title'] = message.text
     await message.answer("Введите свой номер телефона: ")
     await OrderFoodState.next()
+
+@dp.message_handler(state=OrderFoodState.phone_number)
+async def process_food_title(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['phone_number'] = message.text
+    await message.answer("Введите свой адрес:")
+    await OrderFoodState.next()
+
+
+@dp.message_handler(state=OrderFoodState.address)
+async def process_food_title(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['address'] = message.text
+
+    async with state.proxy() as data:
+        name = data['name']
+        title = data['title']
+        phone_number = data['phone_number']
+        address = data['address']
+
+    cursor.execute('''
+        INSERT INTO orders (name, title, phone_number, address )
+        VALUES (?, ?, ?, ?)
+    ''', (name, title, phone_number, address))
+    connect.commit()
+
+    await message.answer("Ваш заказ принят.", reply_markup=start_keyboard)
+
+
+executor.start_polling(dp)
